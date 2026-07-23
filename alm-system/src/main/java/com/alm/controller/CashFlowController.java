@@ -1,29 +1,38 @@
 package com.alm.controller;
 
-import com.alm.database.DBConnection;
-import com.alm.model.CashFlow;
-import org.springframework.stereotype.Repository;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.springframework.stereotype.Repository;
+
+import com.alm.database.DBConnection;
+import com.alm.model.CashFlow;
+
 @Repository
 public class CashFlowController {
     private static final String BASE_SELECT = "SELECT flow_id, asset_id, liability_id, flow_date, amount, flow_type FROM cash_flows";
 
+    private final AssetController assetDao;
+    private final LiabilityController liabilityDao;
+
+    public CashFlowController(AssetController assetDao, LiabilityController liabilityDao) {
+        this.assetDao = assetDao;
+        this.liabilityDao = liabilityDao;
+    }
+
     public int create(CashFlow cashFlow) throws SQLException {
         Objects.requireNonNull(cashFlow, "cashFlow must not be null");
+        validateCashFlowReferences(cashFlow);
         String sql = "INSERT INTO cash_flows (asset_id, liability_id, flow_date, amount, flow_type) VALUES (?, ?, ?, ?, ?)";
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement statement = connection.prepareStatement(sql, new String[] {"flow_id"})) {
             JdbcValue.setNullableInt(statement, 1, cashFlow.getAssetId());
             JdbcValue.setNullableInt(statement, 2, cashFlow.getLiabilityId());
             JdbcValue.setLocalDate(statement, 3, cashFlow.getFlowDate());
@@ -62,6 +71,7 @@ public class CashFlowController {
 
     public boolean update(CashFlow cashFlow) throws SQLException {
         Objects.requireNonNull(cashFlow, "cashFlow must not be null");
+        validateCashFlowReferences(cashFlow);
         String sql = "UPDATE cash_flows SET asset_id = ?, liability_id = ?, flow_date = ?, amount = ?, flow_type = ? WHERE flow_id = ?";
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -72,6 +82,24 @@ public class CashFlowController {
             statement.setString(5, cashFlow.getFlowType());
             statement.setInt(6, cashFlow.getFlowId());
             return statement.executeUpdate() == 1;
+        }
+    }
+
+    private void validateCashFlowReferences(CashFlow cashFlow) throws SQLException {
+        Integer assetId = cashFlow.getAssetId();
+        Integer liabilityId = cashFlow.getLiabilityId();
+
+        if (assetId == null && liabilityId == null) {
+            throw new IllegalArgumentException("cashFlow must reference either an assetId or a liabilityId");
+        }
+        if (assetId != null && liabilityId != null) {
+            throw new IllegalArgumentException("cashFlow must reference only one of assetId or liabilityId");
+        }
+        if (assetId != null && assetDao.findById(assetId).isEmpty()) {
+            throw new IllegalArgumentException("Asset with id " + assetId + " does not exist");
+        }
+        if (liabilityId != null && liabilityDao.findById(liabilityId).isEmpty()) {
+            throw new IllegalArgumentException("Liability with id " + liabilityId + " does not exist");
         }
     }
 

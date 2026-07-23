@@ -1,6 +1,8 @@
 package com.alm.controller;
 
-import com.alm.model.CashFlow;
+import java.sql.SQLException;
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,8 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.sql.SQLException;
-import java.util.List;
+import com.alm.model.CashFlow;
 
 @RestController
 @RequestMapping("/api/cash-flows")
@@ -45,6 +46,7 @@ public class CashFlowRestController {
 
     @PostMapping
     public ResponseEntity<CashFlow> create(@RequestBody CashFlow cashFlow) throws SQLException {
+        System.out.println("Creating CashFlow: " + cashFlow);
         cashFlowDao.create(cashFlow);
         return ResponseEntity.status(201).body(cashFlow);
     }
